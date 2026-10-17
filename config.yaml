@@ -1,0 +1,25 @@
+name: SysLogger
+version: "1.0.0"
+slug: syslogger
+description: Simple syslog receiver (UDP/TCP) with a live web UI
+url: https://github.com/
+arch:
+  - aarch64
+  - amd64
+  - armv7
+  - armhf
+startup: application
+boot: auto
+init: false
+ports:
+  5514/udp: 5514
+  5514/tcp: 5514
+  8515/tcp: 8515
+ports_description:
+  5514/udp: Syslog (UDP)
+  5514/tcp: Syslog (TCP)
+  8515/tcp: Web UI
+options:
+  keep_days: 30
+schema:
+  keep_days: "int(1,3650)"

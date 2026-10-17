@@ -1,0 +1,6 @@
+*.db
+*.bak
+__pycache__/
+.vscode/
+tests/
+tools/

@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SysLogger</title>
+<style>
+  :root { --bg:#fff; --fg:#1d2330; --muted:#6b7280; --line:#e5e7eb; --head:#f3f4f6; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#14171f; --fg:#e5e7eb; --muted:#9ca3af; --line:#2a2f3a; --head:#1c212b; }
+  }
+  body { margin:0; background:var(--bg); color:var(--fg); font:14px system-ui, sans-serif; }
+  header { display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:10px 16px;
+           background:var(--head); border-bottom:1px solid var(--line); position:sticky; top:0; }
+  h1 { font-size:16px; margin:0 12px 0 0; }
+  input, select, button { font:inherit; padding:4px 8px; color:var(--fg); background:var(--bg);
+                          border:1px solid var(--line); border-radius:4px; }
+  #status { color:var(--muted); margin-left:auto; }
+  table { width:100%; border-collapse:collapse; font-family:ui-monospace, Consolas, monospace; font-size:13px; }
+  td { padding:3px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  td.msg { word-break:break-word; width:100%; }
+  td.t, td.h, td.a { white-space:nowrap; color:var(--muted); }
+  .sev { font-weight:600; white-space:nowrap; }
+  .s0,.s1,.s2 { background:rgba(220,38,38,.18); }
+  .s3 { background:rgba(234,88,12,.15); }
+  .s4 { background:rgba(202,138,4,.15); }
+  .s5 .sev { color:#2563eb; }
+  .s7 { color:var(--muted); }
+  #hosts { display:flex; flex-wrap:wrap; gap:8px; padding:8px 16px; border-bottom:1px solid var(--line); }
+  .hc { border:1px solid var(--line); border-left-width:4px; border-radius:4px; padding:4px 10px;
+        cursor:pointer; min-width:150px; background:var(--bg); color:inherit; text-align:left; font:inherit; }
+  .hc b { display:block; }
+  .hc small { color:var(--muted); }
+  .hc.ok { border-left-color:#16a34a; }
+  .hc.warn { border-left-color:#ca8a04; }
+  .hc.stale { border-left-color:#dc2626; }
+  .hc.sel { outline:2px solid #2563eb; }
+</style>
+</head>
+<body>
+<header>
+  <h1>SysLogger</h1>
+  <input id="q" placeholder="Search text / app…" size="24">
+  <select id="sev"><option value="">All severities</option></select>
+  <select id="host"><option value="">All hosts</option></select>
+  <button id="order" title="Switch between newest-first and oldest-first">Newest first ↑</button>
+  <button id="pause">Pause</button>
+  <button id="clear">Clear view</button>
+  <span id="status"></span>
+</header>
+<div id="hosts" title="Last message per host. Green under 1 min, amber under 3 min, red older. Click to filter."></div>
+<table><tbody id="rows"></tbody></table>
+<script>
+const $ = id => document.getElementById(id);
+const MAX_ROWS = 2000;
+let lastId = 0, paused = false, sevNames = [], knownHosts = new Set();
+let newestFirst = true;
+try { newestFirst = localStorage.getItem('newestFirst') !== '0'; } catch (e) { /* storage unavailable */ }
+
+function showOrder() {
+  $('order').textContent = newestFirst ? 'Newest first ↑' : 'Oldest first ↓';
+}
+
+function params() {
+  const p = new URLSearchParams({ since_id: lastId });
+  if ($('q').value) p.set('q', $('q').value);
+  if ($('sev').value) p.set('severity', $('sev').value);
+  if ($('host').value) p.set('host', $('host').value);
+  return p;
+}
+
+function resetView() { $('rows').textContent = ''; lastId = 0; poll(); }
+
+function addRow(m) {
+  const tr = document.createElement('tr');
+  tr.className = 's' + m.severity;
+  const cells = [
+    ['t', m.received_at.replace('T', ' ').replace('+00:00', 'Z')],
+    ['h', m.host || ''],
+    ['a', m.app || ''],
+    ['sev', m.severity == null ? '' : (sevNames[m.severity] || m.severity)],
+    ['msg', m.message],
+  ];
+  for (const [cls, text] of cells) {
+    const td = document.createElement('td');
+    td.className = cls;
+    td.textContent = text;          // textContent: log data is untrusted
+    tr.appendChild(td);
+  }
+  if (newestFirst) $('rows').prepend(tr); else $('rows').appendChild(tr);
+}
+
+async function poll() {
+  if (paused) return;
+  try {
+    const res = await fetch('/api/messages?' + params());
+    const data = await res.json();
+    if (!sevNames.length) {
+      sevNames = data.severities;
+      sevNames.forEach((n, i) => $('sev').add(new Option(`${n} and above`, i)));
+    }
+    for (const h of data.hosts) {
+      if (!knownHosts.has(h)) { knownHosts.add(h); $('host').add(new Option(h, h)); }
+    }
+    const atBottom = innerHeight + scrollY >= document.body.scrollHeight - 40;
+    for (const m of data.messages) { addRow(m); lastId = m.id; }   // API returns oldest first
+    while ($('rows').childElementCount > MAX_ROWS) {
+      (newestFirst ? $('rows').lastChild : $('rows').firstChild).remove();
+    }
+    if (!newestFirst && atBottom && data.messages.length) scrollTo(0, document.body.scrollHeight);
+    $('status').textContent = 'Live · ' + new Date().toLocaleTimeString();
+  } catch (e) {
+    $('status').textContent = 'Disconnected';
+  }
+}
+
+function ago(sec) {
+  if (sec < 60) return sec + 's ago';
+  if (sec < 3600) return Math.floor(sec / 60) + 'm ' + (sec % 60) + 's ago';
+  if (sec < 86400) return Math.floor(sec / 3600) + 'h ' + Math.floor(sec % 3600 / 60) + 'm ago';
+  return Math.floor(sec / 86400) + 'd ago';
+}
+
+let hostData = [];
+function renderHosts() {
+  const box = $('hosts');
+  box.textContent = '';
+  const now = Date.now();
+  for (const h of hostData) {
+    const sec = Math.max(0, Math.round((now - Date.parse(h.received_at)) / 1000));
+    const b = document.createElement('button');
+    b.className = 'hc ' + (sec < 60 ? 'ok' : sec < 180 ? 'warn' : 'stale') + ($('host').value === h.host ? ' sel' : '');
+    b.title = (h.app ? h.app + ': ' : '') + h.message;
+    const name = document.createElement('b');
+    name.textContent = h.host;
+    const info = document.createElement('small');
+    info.textContent = `${ago(sec)} · ${h.n} msgs`;
+    b.append(name, info);
+    b.onclick = () => {
+      $('host').value = $('host').value === h.host ? '' : h.host;
+      resetView(); renderHosts();
+    };
+    box.appendChild(b);
+  }
+}
+
+async function pollHosts() {
+  try {
+    hostData = await (await fetch('/api/hosts')).json();
+  } catch (e) { /* keep showing last data; ages keep counting */ }
+  renderHosts();
+}
+
+['q', 'sev', 'host'].forEach(id => $(id).addEventListener('input', resetView));
+$('order').onclick = () => {
+  newestFirst = !newestFirst;
+  try { localStorage.setItem('newestFirst', newestFirst ? '1' : '0'); } catch (e) { /* ignore */ }
+  const body = $('rows');
+  body.append(...Array.from(body.children).reverse());   // flip what is already on screen
+  showOrder();
+  scrollTo(0, newestFirst ? 0 : document.body.scrollHeight);
+};
+$('pause').onclick = () => {
+  paused = !paused;
+  $('pause').textContent = paused ? 'Resume' : 'Pause';
+  if (!paused) poll();
+  else $('status').textContent = 'Paused';
+};
+$('clear').onclick = () => { $('rows').textContent = ''; };
+showOrder();
+poll();
+pollHosts();
+setInterval(poll, 2000);
+setInterval(pollHosts, 2000);
+setInterval(renderHosts, 1000);   // keep the "ago" counters ticking between polls
+</script>
+</body>
+</html>

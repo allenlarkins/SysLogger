@@ -1,0 +1,19 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "SysLogger",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Send test messages",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/tools/send_test.py",
+      "console": "integratedTerminal"
+    }
+  ]
+}
