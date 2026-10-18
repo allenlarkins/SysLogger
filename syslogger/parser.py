@@ -65,5 +65,10 @@ def parse(raw, source_ip):
         result["message"] = m3.group(4)
         return result
 
+    mt = TASMOTA_RE.match(body)   # newer Tasmota: "<PRI>DEVICE ESP-TAG: msg", no timestamp
+    if mt:
+        result["host"], result["app"], result["message"] = mt.groups()
+        return result
+
     result["message"] = body
     return result

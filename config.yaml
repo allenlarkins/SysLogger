@@ -1,5 +1,5 @@
 name: SysLogger
-version: "1.0.0"
+version: "1.0.1"
 slug: syslogger
 description: Simple syslog receiver (UDP/TCP) with a live web UI
 url: https://github.com/

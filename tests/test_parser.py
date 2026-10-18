@@ -57,6 +57,13 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(r["app"], "ESP-Project")
         self.assertEqual(r["message"], "tasmota - Western Sensor Version 9.5.0.99")
 
+    def test_tasmota_with_pri_and_no_timestamp(self):
+        r = parse("<14>eastern ESP-MQT: tele/easternsensor/SENSOR = {}", "192.168.10.108")
+        self.assertEqual(r["host"], "eastern")
+        self.assertEqual(r["app"], "ESP-MQT")
+        self.assertEqual(r["severity"], 6)
+        self.assertEqual(r["message"], "tele/easternsensor/SENSOR = {}")
+
     def test_invalid_pri(self):
         self.assertIsNone(parse("<999>foo", "1.1.1.1")["severity"])
 
