@@ -2,7 +2,7 @@ name: SysLogger
 version: "1.0.1"
 slug: syslogger
 description: Simple syslog receiver (UDP/TCP) with a live web UI
-url: https://github.com/
+url: https://github.com/allenlarkins/SysLogger
 arch:
   - aarch64
   - amd64
