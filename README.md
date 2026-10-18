@@ -43,3 +43,7 @@ tests/, tools/      unit tests and helper scripts
 ## Security
 
 The web UI has no authentication. Keep it on a trusted network and do not expose it to the internet.
+
+## License
+
+[MIT](LICENSE)
